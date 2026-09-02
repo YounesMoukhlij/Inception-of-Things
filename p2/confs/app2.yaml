@@ -5,7 +5,7 @@ metadata:
   labels:
     app: app2
 spec:
-  replicas: 3                 # <-- the subject requires 3 replicas for app2
+  replicas: 3              
   selector:
     matchLabels:
       app: app2
