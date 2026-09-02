@@ -1,0 +1,27 @@
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
+
+LOGIN     = "ynassibi"
+HOSTNAME  = "#{LOGIN}S"
+SERVER_IP = "192.168.56.110"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/centos9s" 
+  config.vm.box_check_update = false
+
+  config.vm.synced_folder ".", "/vagrant", type: "rsync",
+    rsync__exclude: [".vagrant/", "*.log"]
+
+  config.vm.define HOSTNAME do |server|
+    server.vm.hostname = HOSTNAME
+    server.vm.network "private_network", ip: SERVER_IP   # -> eth1
+
+    server.vm.provider :libvirt do |lv|
+      lv.driver = "qemu"        # no KVM on this host -> software emulation
+      lv.default_prefix = ""
+      lv.memory = 2048
+      lv.cpus   = 1
+    end
+
+    server.vm.provision "shell", path: "scripts/setup.sh"
+  end
+end
