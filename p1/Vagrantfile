@@ -1,0 +1,51 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# --- Configuration -----------------------------------------------------
+LOGIN         = "youmoukh"                # team member login, used as VM name prefix
+# BOX           = "ubuntu/jammy64"          # Ubuntu 22.04 LTS, latest stable
+# BOX           = "bento/ubuntu-22.04-arm64"
+BOX = "gyptazy/ubuntu22.04-arm64"
+SERVER_IP     = "192.168.56.110"
+WORKER_IP     = "192.168.56.111"
+VM_CPUS       = 1
+VM_MEMORY     = 1024                      # MB
+# -------------------------------------------------------------------------
+
+Vagrant.configure("2") do |config|
+
+  # ---------------------- Server (control-plane) node --------------------
+  config.vm.define "#{LOGIN}S" do |server|
+    server.vm.box      = BOX
+    server.vm.hostname = "#{LOGIN}S"
+
+    server.vm.network "private_network", ip: SERVER_IP
+
+    server.vm.provider "VMware" do |vb|
+      vb.name   = "#{LOGIN}S"
+      vb.cpus   = VM_CPUS
+      vb.memory = VM_MEMORY
+    end
+
+    # Ship the K3s config.yaml template, then run the install script.
+    server.vm.provision "file", source: "confs/server.yaml", destination: "/tmp/config.yaml"
+    server.vm.provision "shell", path: "scripts/server.sh", args: [SERVER_IP]
+  end
+
+  # ---------------------- ServerWorker (agent) node -----------------------
+  config.vm.define "#{LOGIN}SW" do |worker|
+    worker.vm.box      = BOX
+    worker.vm.hostname = "#{LOGIN}SW"
+
+    worker.vm.network "private_network", ip: WORKER_IP
+
+    worker.vm.provider "VMware" do |vb|
+      vb.name   = "#{LOGIN}SW"
+      vb.cpus   = VM_CPUS
+      vb.memory = VM_MEMORY
+    end
+
+    worker.vm.provision "file", source: "confs/agent.yaml", destination: "/tmp/config.yaml"
+    worker.vm.provision "shell", path: "scripts/worker.sh", args: [SERVER_IP, WORKER_IP]
+  end
+end
