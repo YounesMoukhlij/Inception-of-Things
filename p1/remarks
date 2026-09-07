@@ -1,0 +1,3 @@
+- On youmoukhS (Server) during [Verifying k3s installation] --> no ressources found (it must list the master node i think)
+
+- On youmoukhSW or the server youmoukhS the cmd : ip addr show eth1 says there is no interface eth1 
