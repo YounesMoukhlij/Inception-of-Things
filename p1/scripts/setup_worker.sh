@@ -3,19 +3,32 @@
 # Setup script for K3s Worker (Agent mode)
 # This script installs K3s in agent mode and joins the cluster
 
+# This script expects the following environment variables to be set:
+# - K3S_TOKEN: The shared secret token used to join the K3s cluster
+
 set -e
 
 # Define IPs
 SERVER_IP="192.168.56.110"
 WORKER_IP="192.168.56.111"
 
+
+# ------------------------------------------------------------------
 # Detect the interface that already carries the private-network IP instead
 # of hardcoding a name like enp0s8, which can vary across base boxes.
+# ------------------------------------------------------------------
+
 IFACE=$(ip -4 -o addr show | awk -v ip="$WORKER_IP" '$0 ~ ip {print $2; exit}')
+
+
+
+
 
 echo "=== Installing K3s in Agent (Worker) mode ==="
 echo "Using network interface: ${IFACE}"
 
+
+# ------------------------------------------------------------------
 # Nested virtualization (this VM runs inside another VirtualBox VM) corrupts
 # TCP checksum/segmentation offload on virtio NICs and black-holes larger TCP
 # payloads (ICMP and tiny requests still work, but a large download or K3s's
@@ -25,6 +38,9 @@ echo "Using network interface: ${IFACE}"
 # offload and dropping the MTU on ALL interfaces works around it; the
 # systemd unit reapplies both on every boot since they don't persist on
 # their own.
+# ------------------------------------------------------------------
+
+
 ALL_IFACES=$(ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$')
 for iface in ${ALL_IFACES}; do
     ethtool -K "${iface}" tx off rx off gso off gro off tso off 2>/dev/null || true
@@ -49,10 +65,16 @@ done
 systemctl daemon-reload
 systemctl enable --now disable-nic-offload.service
 
+echo "=== Disabled NIC offload and capped MTU on all interfaces ✅==="
+
+
+# ------------------------------------------------------------------
 # Wait until the server's API reports ready, instead of polling forever for a
 # TCP connection that may never become usable.
+# ------------------------------------------------------------------
+
 echo "=== Waiting for K3s server API at ${SERVER_IP}:6443 ==="
-sleep 10
+sleep 5  # Give the server a moment to start up before polling
 for attempt in $(seq 1 60); do
     http_code=$(curl -sk --max-time 2 -o /dev/null -w '%{http_code}' \
         "https://${SERVER_IP}:6443/readyz" || true)
@@ -70,16 +92,24 @@ for attempt in $(seq 1 60); do
     echo "Server not ready yet, retrying (${attempt}/60)..."
     sleep 5
 done
+echo "=== K3s server API is ready ✅==="
 
+# ------------------------------------------------------------------
 # Install K3s in agent mode
 # --server: URL of the K3s server to join
 # --token: Shared secret configured on the server (see Vagrantfile)
 # --node-ip: IP address to advertise for this node
 # --flannel-iface: Network interface for flannel CNI (auto-detected above)
+# ------------------------------------------------------------------
+
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent \
     --server https://${SERVER_IP}:6443 \
     --token ${K3S_TOKEN} \
     --node-ip ${WORKER_IP} \
     --flannel-iface ${IFACE}" sh -
 
-echo "=== K3s Worker setup complete ==="
+
+echo ""
+echo "=== K3s Worker setup complete ✅==="
+echo "=== K3s Worker kubeconfig is at /etc/rancher/k3s/k3s.yaml ==="
+echo ""
