@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-app
+  namespace: dev
+  labels:
+    app: iot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iot-app
+  template:
+    metadata:
+      labels:
+        app: iot-app
+    spec:
+      containers:
+        - name: iot-app
+          image: otmanoulcaid/iot:v1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
