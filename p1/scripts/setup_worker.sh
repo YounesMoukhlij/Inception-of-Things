@@ -71,26 +71,41 @@ echo "=== Disabled NIC offload and capped MTU on all interfaces ✅==="
 # ------------------------------------------------------------------
 # Wait until the server's API reports ready, instead of polling forever for a
 # TCP connection that may never become usable.
+#
+# The Vagrantfile serialises the two machines, so the server is normally fully
+# provisioned before this script runs and the very first poll succeeds. The
+# budget below is still sized for the worst case -- this VM booting next to a
+# server only part-way through downloading and installing K3s -- because waiting
+# a while longer always beats aborting the provisioner. Bringing the worker up
+# on its own, or re-running `vagrant provision`, both land here too.
 # ------------------------------------------------------------------
 
-echo "=== Waiting for K3s server API at ${SERVER_IP}:6443 ==="
+API_WAIT_INTERVAL=5     # seconds between polls
+API_WAIT_ATTEMPTS=240   # 240 x 5s = 20 minutes
+API_WAIT_MINUTES=$((API_WAIT_ATTEMPTS * API_WAIT_INTERVAL / 60))
+
+echo "=== Waiting up to ${API_WAIT_MINUTES}m for the K3s server API at ${SERVER_IP}:6443 ==="
 sleep 5  # Give the server a moment to start up before polling
-for attempt in $(seq 1 60); do
+for attempt in $(seq 1 "${API_WAIT_ATTEMPTS}"); do
     http_code=$(curl -sk --max-time 2 -o /dev/null -w '%{http_code}' \
         "https://${SERVER_IP}:6443/readyz" || true)
     if [ "${http_code}" = "200" ] || [ "${http_code}" = "401" ]; then
         break
     fi
 
-    if [ "${attempt}" -eq 60 ]; then
-        echo "Timed out waiting for the K3s server API. Network diagnostics:"
+    if [ "${attempt}" -eq "${API_WAIT_ATTEMPTS}" ]; then
+        echo "Timed out after ${API_WAIT_MINUTES}m waiting for the K3s server API."
+        echo "Is the server VM up and fully provisioned? Network diagnostics:"
         ip route
         curl -vk --max-time 5 "https://${SERVER_IP}:6443/readyz" || true
         exit 1
     fi
 
-    echo "Server not ready yet, retrying (${attempt}/60)..."
-    sleep 5
+    # Report every sixth poll only, so a long wait doesn't bury the log.
+    if [ "$((attempt % 6))" -eq 1 ]; then
+        echo "Server not ready yet, still retrying ($((attempt * API_WAIT_INTERVAL))s elapsed)..."
+    fi
+    sleep "${API_WAIT_INTERVAL}"
 done
 echo "=== K3s server API is ready ✅==="
 
