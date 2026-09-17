@@ -8,27 +8,16 @@ set -e
 # Define the server IP
 SERVER_IP="192.168.56.110"
 
-
 # ------------------------------------------------------------------
 # Detect the interface that already carries the private-network IP instead
 # of hardcoding a name like enp0s8, which can vary across base boxes.
 # ------------------------------------------------------------------
-
 
 IFACE=$(ip -4 -o addr show | awk -v ip="$SERVER_IP" '$0 ~ ip {print $2; exit}')
 
 echo "=== Installing K3s in Server (Controller) mode ==="
 echo "Using network interface: ${IFACE}"
 
-# Nested virtualization (this VM runs inside another VirtualBox VM) corrupts
-# TCP checksum/segmentation offload on virtio NICs and black-holes larger TCP
-# payloads (ICMP and tiny requests still work, but a large download or K3s's
-# mTLS handshake doesn't). This hits every interface, not just the private
-# one: the NAT interface (used for the k3s.io download right below, and for
-# Vagrant's own provisioning SSH session) is just as affected. Disabling
-# offload and dropping the MTU on ALL interfaces works around it; the
-# systemd unit reapplies both on every boot since they don't persist on
-# their own.
 ALL_IFACES=$(ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$')
 for iface in ${ALL_IFACES}; do
     ethtool -K "${iface}" tx off rx off gso off gro off tso off 2>/dev/null || true
@@ -54,12 +43,6 @@ systemctl daemon-reload
 systemctl enable --now disable-nic-offload.service
 
 # Install K3s in server mode
-# --write-kubeconfig-mode 644: Makes kubeconfig readable by all users
-# --node-ip: Sets the IP address to advertise for this node
-# --bind-address: IP address to bind the API server to
-# --flannel-iface: Network interface for flannel CNI (auto-detected above)
-# --token: Fixed shared secret (see Vagrantfile) so the worker can join
-#          without depending on the synced folder to relay a generated token
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
     --write-kubeconfig-mode 644 \
     --node-ip ${SERVER_IP} \
