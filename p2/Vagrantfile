@@ -1,25 +1,29 @@
-ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'virtualbox'
 
 LOGIN     = "ynassibi"
 HOSTNAME  = "#{LOGIN}S"
 SERVER_IP = "192.168.56.110"
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/centos9s" 
+  config.vm.box = "ubuntu/jammy64"      # Ubuntu 22.04 LTS, VirtualBox-only box
   config.vm.box_check_update = false
 
+  # rsync instead of VirtualBox shared folders: Canonical's boxes ship without
+  # Guest Additions, so vboxsf cannot mount at all. Edits to confs/ need a
+  # `vagrant rsync` (or `vagrant provision`, which rsyncs first) to reach the VM.
   config.vm.synced_folder ".", "/vagrant", type: "rsync",
     rsync__exclude: [".vagrant/", "*.log"]
 
   config.vm.define HOSTNAME do |server|
     server.vm.hostname = HOSTNAME
-    server.vm.network "private_network", ip: SERVER_IP   # -> eth1
+    # Host-only network -> second NIC (eth1). 192.168.56.0/24 is inside the range
+    # VirtualBox allows by default, so no /etc/vbox/networks.conf entry is needed.
+    server.vm.network "private_network", ip: SERVER_IP
 
-    server.vm.provider :libvirt do |lv|
-      lv.driver = "qemu"        # no KVM on this host -> software emulation
-      lv.default_prefix = ""
-      lv.memory = 2048
-      lv.cpus   = 1
+    server.vm.provider :virtualbox do |vb|
+      vb.name   = HOSTNAME
+      vb.memory = 2048
+      vb.cpus   = 1
     end
 
     server.vm.provision "shell", path: "scripts/setup.sh"

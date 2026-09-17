@@ -1,7 +1,7 @@
-# IoT - Part 2: K3s and three simple applications (libvirt/KVM)
+# IoT - Part 2: K3s and three simple applications (VirtualBox)
 
-Single VM running K3s (server mode) at `192.168.56.110`, serving three apps
-routed by HTTP Host header via a Traefik Ingress.
+Single `ubuntu/jammy64` VM running K3s (server mode) at `192.168.56.110`, serving
+three apps routed by HTTP Host header via a Traefik Ingress.
 
 | Host        | App  | Replicas |
 |-------------|------|----------|
@@ -12,10 +12,24 @@ routed by HTTP Host header via a Traefik Ingress.
 ## Host setup (one time)
 ```
 # Debian/Ubuntu host:
-sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-dev \
-                    ebtables dnsmasq-base ruby-dev gcc make pkg-config
-sudo usermod -aG libvirt,kvm $USER      # then log out/in
-vagrant plugin install vagrant-libvirt
+sudo apt install -y virtualbox virtualbox-dkms linux-headers-$(uname -r) \
+                    vagrant rsync
+```
+No Vagrant plugin is needed - the VirtualBox provider ships with Vagrant.
+
+### If Secure Boot is enabled
+VirtualBox's kernel modules are built by DKMS but are unsigned, so a locked-down
+kernel refuses to load them and `/dev/vboxdrv` never appears. Check with:
+```
+mokutil --sb-state
+ls -l /dev/vboxdrv
+```
+If Secure Boot is on, either turn it off in the BIOS/UEFI setup, or enroll a
+signing key:
+```
+sudo mokutil --import /var/lib/shim-signed/mok/MOK.der   # set a one-time password
+sudo reboot                                             # enroll the key in the MOK manager
+sudo modprobe vboxdrv                                   # should now succeed
 ```
 
 ## Before you run
