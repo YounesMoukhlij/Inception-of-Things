@@ -50,10 +50,22 @@ curl -H "Host: app1.com" 192.168.56.110   # -> Hello from app1
 curl -H "Host: app2.com" 192.168.56.110   # -> Hello from app2
 ```
 
+## System design (PDF)
+`k3s-system-design.pdf` -- 7 hand-drawn pages: the whole stack on one page, what the
+three files do, why server mode, why an Ingress, how `replicas: 3` becomes 3 pods,
+one request end to end, and the failures worth knowing in advance.
+
+Regenerate it with:
+```
+python3 docs/build.py k3s-system-design.pdf     # needs reportlab
+```
+
 Layout:
 ```
 p2/
 ├── Vagrantfile
+├── k3s-system-design.pdf
+├── docs/           # generator for the PDF
 ├── scripts/setup.sh
 └── confs/{app1,app2,app3,ingress}.yaml
 ```
