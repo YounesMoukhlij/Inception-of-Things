@@ -1,0 +1,66 @@
+# -*- mode: ruby -*-
+
+# ---------------------------------------------------------
+# Vagrantfile for configuring virtual machine infrastructure using Vagrant
+# ---------------------------------------------------------
+# ---------------------------------------------------------
+# ------------------- Bring-up Ordering -------------------
+# ---------------------------------------------------------
+
+ENV['VAGRANT_NO_PARALLEL'] = 'yes'
+
+
+# ---------------------------------------------------------
+# ----------------- Configuration Flags -------------------
+# ---------------------------------------------------------
+
+BOX = "ubuntu/jammy64"  
+SERVER = "youmoukhS"  
+WORKER = "youmoukhSW"  
+SERVER_IP = "192.168.56.110"
+WORKER_IP = "192.168.56.111"
+MEMORY = 1024  
+CPUS = 1  
+VIRTIO_NIC = "virtio"  
+
+
+# ---------------------------------------------------------
+# ---------------- VagrantConfiguration  ------------------
+# ---------------------------------------------------------
+
+# Configure Vagrant with version 2 API
+Vagrant.configure("2") do |config|
+  config.vm.box = BOX
+  config.vm.boot_timeout = 600
+
+  k3s_token = "iot-k3s-cluster-token"
+
+  # -------------------------------------------------------
+  # SERVER Configuration (S)
+  # ---------------------------------------------------------
+  config.vm.define SERVER do |s|
+    s.vm.hostname = SERVER
+    s.vm.network "private_network", ip: SERVER_IP
+
+    s.vm.provider "virtualbox" do |vb|
+      vb.memory = MEMORY
+      vb.cpus = CPUS
+      vb.customize ["modifyvm", :id, "--nictype1", VIRTIO_NIC, "--nictype2", VIRTIO_NIC ]
+    end
+    s.vm.provision "shell", path: "scripts/setup_server.sh", env: { "K3S_TOKEN" => k3s_token }
+  end
+  # ---------------------------------------------------------
+  # WORKER Configuration (SW)
+  # ---------------------------------------------------------
+  config.vm.define WORKER do |sw|
+    sw.vm.hostname = WORKER
+    sw.vm.network "private_network", ip: WORKER_IP
+
+    sw.vm.provider "virtualbox" do |vb|
+      vb.memory = MEMORY
+      vb.cpus = CPUS
+      vb.customize ["modifyvm", :id, "--nictype1", VIRTIO_NIC, "--nictype2", VIRTIO_NIC ]
+    end
+    sw.vm.provision "shell", path: "scripts/setup_worker.sh", env: { "K3S_TOKEN" => k3s_token }
+  end
+end
