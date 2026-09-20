@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/otmanoulcaid/iot-k3s.git
+    repoURL: https://github.com/YounesMoukhlij/Inception-of-Things.git
     targetRevision: HEAD
     path: p3/confs/app
   destination:
