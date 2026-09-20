@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Nassibi107/Inception-of-Things.git
+    repoURL: https://github.com/otmanoulcaid/inception-of-things.git
     targetRevision: HEAD
     path: p3/confs/app
   destination:
