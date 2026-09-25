@@ -1,0 +1,25 @@
+# The manifest that Argo CD pulls from the LOCAL GitLab.
+# Change v1 -> v2 here (in GitLab, not on disk) to demo the continuous deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wil-playground
+  namespace: dev
+  labels:
+    app: wil-playground
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wil-playground
+  template:
+    metadata:
+      labels:
+        app: wil-playground
+    spec:
+      containers:
+        - name: wil-playground
+          image: wil42/playground:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8888

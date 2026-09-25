@@ -1,0 +1,11 @@
+# k3s/k3d CoreDNS imports every *.override file of this ConfigMap inside its
+# server block, so gitlab.local becomes resolvable from INSIDE the cluster
+# (Argo CD repo-server needs it to clone the repository).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  gitlab.override: |
+    rewrite name gitlab.local gitlab.gitlab.svc.cluster.local

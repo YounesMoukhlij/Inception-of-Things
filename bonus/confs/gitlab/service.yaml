@@ -1,0 +1,21 @@
+# Stable in-cluster name: gitlab.gitlab.svc.cluster.local:80
+# This is what the CoreDNS rewrite of gitlab.local points to, so Argo CD can
+# clone http://gitlab.local/root/iot.git from inside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab
+  namespace: gitlab
+  labels:
+    app: gitlab
+spec:
+  type: ClusterIP
+  selector:
+    app: gitlab
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: ssh
+      port: 22
+      targetPort: 22

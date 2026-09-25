@@ -1,0 +1,26 @@
+# Exactly the Part 3 Application, except that the source repository is no
+# longer GitHub: it is the GitLab instance running inside the cluster.
+# http://gitlab.local resolves:
+#   - on the host   -> /etc/hosts  -> 127.0.0.1:80 -> k3d loadbalancer -> Traefik -> GitLab
+#   - in the cluster-> CoreDNS rewrite -> Service gitlab.gitlab.svc.cluster.local:80
+# so the SAME clone URL works for the browser, for git push and for Argo CD.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wil-playground
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://gitlab.local/root/iot.git
+    targetRevision: HEAD
+    path: confs/app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

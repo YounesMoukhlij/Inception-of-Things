@@ -1,0 +1,126 @@
+# ============================================================================
+#  GitLab CE, official omnibus image (gitlab/gitlab-ce:latest), running
+#  INSIDE the cluster in the "gitlab" namespace.
+#
+#  Why the image and not the official Helm chart: since chart v10.0.0 the
+#  chart no longer bundles PostgreSQL, Redis and object storage - it now
+#  REQUIRES external ones ("Since chart v10.0.0, external PostgreSQL became
+#  required"). The omnibus image ships the whole stack (Puma, Workhorse,
+#  Gitaly, PostgreSQL, Redis, NGINX) and always pulls the latest release,
+#  which is what a self-contained local lab needs.
+#
+#  StatefulSet (not Deployment) for the stable name and the three volumes.
+# ============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab
+  namespace: gitlab
+  labels:
+    app: gitlab
+spec:
+  serviceName: gitlab
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab
+  template:
+    metadata:
+      labels:
+        app: gitlab
+    spec:
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        fsGroup: 0
+      containers:
+        - name: gitlab
+          image: gitlab/gitlab-ce:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            # Initial root password, created by scripts/setup.sh.
+            - name: GITLAB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-root-password
+                  key: password
+            # Omnibus configuration (evaluated as gitlab.rb at boot).
+            - name: GITLAB_OMNIBUS_CONFIG
+              value: |
+                external_url 'http://gitlab.local'
+                gitlab_rails['initial_root_password'] = ENV['GITLAB_ROOT_PASSWORD']
+                gitlab_rails['gitlab_shell_ssh_port'] = 22
+                # /-/health and /-/readiness are restricted to this whitelist:
+                # without the cluster CIDRs the kubelet probes get a 404 and the
+                # pod never becomes Ready (then liveness restarts it in a loop).
+                gitlab_rails['monitoring_whitelist'] = ['127.0.0.0/8', '::1/128',
+                                                        '10.0.0.0/8', '172.16.0.0/12',
+                                                        '192.168.0.0/16']
+                nginx['listen_port'] = 80
+                nginx['listen_https'] = false
+                letsencrypt['enable'] = false
+                # Trim everything this lab does not need.
+                registry['enable'] = false
+                prometheus_monitoring['enable'] = false
+                gitlab_kas['enable'] = false
+                # Keep the memory footprint reasonable on a laptop.
+                puma['worker_processes'] = 2
+                sidekiq['max_concurrency'] = 9
+          ports:
+            - name: http
+              containerPort: 80
+            - name: ssh
+              containerPort: 22
+          # First boot (reconfigure + migrations) takes 10 to 15 minutes, and
+          # much more on a slow machine: 180 * 10s = 30 minutes of budget
+          # before Kubernetes declares the pod failed. Later boots take ~5 min.
+          startupProbe:
+            httpGet:
+              path: /-/health
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 180
+          readinessProbe:
+            httpGet:
+              path: /-/readiness
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /-/health
+              port: 80
+            periodSeconds: 30
+            failureThreshold: 10
+          resources:
+            requests:
+              cpu: 500m
+              memory: 3Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/gitlab
+            - name: logs
+              mountPath: /var/log/gitlab
+            - name: data
+              mountPath: /var/opt/gitlab
+  volumeClaimTemplates:
+    - metadata:
+        name: config
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: logs
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
